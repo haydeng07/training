@@ -29,11 +29,22 @@ foreach pkg in estout esttab{
 	}
 
 ** Declare global (Note: change this to your local path if it differs)
-if "`c(os)'" == "MacOSX" global github = "/Users/`c(username)'/Documents/GitHub/training"
+if "`c(os)'" == "MacOSX" global github = "/Users/haydeng07/training"
 else global github = "C:/Users/`c(username)'/Documents/GitHub/training"
 
 ** Load data
 sysuse auto, clear // use example dataset that comes with Stata
+
+** Separate the manufacturer from the model name
+gen car_make = word(strtrim(make), 1)
+label variable car_make "Car make"
+
+** Create a numeric identifier for use in the fixed-effects regression
+encode car_make, gen(car_make_id)
+
+** Fixed effects require manufacturers represented by multiple cars
+** bysort car_make_id: gen make_observations = _N
+** keep if make_observations > 1
 
 ** Store the mean MPG
 sum mpg
@@ -44,17 +55,17 @@ latex_write meanMPG "`mean'" // the command name should only consist of letters
 eststo clear
 reg weight length, r
 eststo spec1
-estadd local typefe "No" // note whether car type fixed effects are included
+estadd local makefe "No" // note whether car make fixed effects are included
 
-** Run a regression of car weight on length, with car type fixed effects
-reg weight length i.foreign, r
+** Run a regression of car weight on length, with car make fixed effects
+reg weight length i.car_make_id, r
 eststo spec2
-estadd local typefe "Yes"
+estadd local makefe "Yes"
 
 ** Export table
 esttab spec2 spec1 using "$github/analysis/output/car_weight_regs.tex", ///
 	replace se nonote numbers b(%8.2f) se(%8.2f) ///
 	keep(length) nomtitles star(* 0.10 ** 0.05 *** 0.01) ///
 	varlabels(length "Car length (inches)") ///
-	stats(typefe r2 N, l("Car type fixed effects" "\$R^{2}$" "Observations") ///
+	stats(makefe r2 N, l("Car make fixed effects" "\$R^{2}$" "Observations") ///
 	fmt(%8.0fc %8.2fc %8.0fc))
